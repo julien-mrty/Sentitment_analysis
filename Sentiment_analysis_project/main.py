@@ -1,102 +1,53 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
+import data_processing
+
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score
-from collections import Counter
-import re
-import numpy as np
 
-# Sample dataset (you should replace this with your actual dataset)
-texts = ["I love this product", "This is terrible", "Amazing experience", "I hate it", "Best purchase ever",
-         "Not worth it"]
-labels = [1, 0, 1, 0, 1, 0]
+training_csv_path = "C:/Users/julie/Desktop/All/Important/Polytech/Inge_3/AI/Datasets/twitter_training.csv"
+validation_csv_path = "C:/Users/julie/Desktop/All/Important/Polytech/Inge_3/AI/Datasets/twitter_validation.csv"
 
 
-# Text preprocessing: tokenization and padding
-def preprocess_texts(texts, vocab_size=5000, max_length=10):
-    all_words = [word for text in texts for word in re.findall(r'\b\w+\b', text.lower())]
-    word_counts = Counter(all_words)
-    vocab = {word: i + 1 for i, (word, _) in enumerate(word_counts.most_common(vocab_size - 1))}
+def train(sentiments_list, messages_list):
+    # Convert text data to numerical features
+    vectorizer = CountVectorizer()
+    X = vectorizer.fit_transform(messages_list)  # Transform phrases into a bag-of-words representation
 
-    def encode(text):
-        words = re.findall(r'\b\w+\b', text.lower())
-        return [vocab.get(word, 0) for word in words][:max_length] + [0] * (max_length - len(words))
+    # Split data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, sentiments_list, test_size=0.2, random_state=42)
 
-    return [encode(text) for text in texts], vocab
+    # Initialize and train the Naive Bayes classifier
+    model = MultinomialNB()
+    model.fit(X_train, y_train)
 
+    # Make predictions and evaluate the model
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f'Accuracy: {accuracy * 100:.2f}%')
 
-# Prepare data
-X, vocab = preprocess_texts(texts)
-X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.2, random_state=42)
-
-
-# Dataset class
-class SentimentDataset(Dataset):
-    def __init__(self, texts, labels):
-        self.texts = torch.tensor(texts, dtype=torch.long)
-        self.labels = torch.tensor(labels, dtype=torch.float32)
-
-    def __len__(self):
-        return len(self.labels)
-
-    def __getitem__(self, idx):
-        return self.texts[idx], self.labels[idx]
+    return model, vectorizer  # Return model and vectorizer for later use
 
 
-train_dataset = SentimentDataset(X_train, y_train)
-test_dataset = SentimentDataset(X_test, y_test)
-train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=2)
+def predict_phrase(model, vectorizer):
+    while True:
+        my_phrase = input("Enter a phrase (or 'exit' to quit): ")
+        if my_phrase.lower() == 'exit':
+            break
+
+        my_phrase_vec = vectorizer.transform([my_phrase])  # Transform the input phrase
+        prediction = model.predict(my_phrase_vec)
+        print("Sentiment:", prediction[0])
 
 
-# Model definition
-class SentimentModel(nn.Module):
-    def __init__(self, vocab_size, embed_dim, hidden_dim):
-        super(SentimentModel, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, embed_dim)
-        self.fc = nn.Sequential(
-            nn.Linear(embed_dim * 10, hidden_dim),  # 10 is max length
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
-            nn.Sigmoid()
-        )
+def main():
+    sentiments_list, messages_list = data_processing.load_data(training_csv_path)
+    messages_list_unicode = data_processing.pre_process_phrases(messages_list)
 
-    def forward(self, x):
-        x = self.embedding(x).view(x.size(0), -1)  # Flatten
-        return self.fc(x)
+    model, vectorizer = train(sentiments_list, messages_list_unicode)  # Get the trained model and vectorizer
+
+    predict_phrase(model, vectorizer)  # Start the prediction loop
 
 
-# Parameters
-vocab_size = len(vocab) + 1  # Account for padding index
-embed_dim = 16
-hidden_dim = 32
-model = SentimentModel(vocab_size, embed_dim, hidden_dim)
-criterion = nn.BCELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-# Training loop
-num_epochs = 5
-for epoch in range(num_epochs):
-    model.train()
-    for texts, labels in train_loader:
-        optimizer.zero_grad()
-        outputs = model(texts).squeeze()
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-    print(f'Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.4f}')
-
-# Evaluation
-model.eval()
-all_preds, all_labels = [], []
-with torch.no_grad():
-    for texts, labels in test_loader:
-        outputs = model(texts).squeeze()
-        preds = (outputs >= 0.5).float()
-        all_preds.extend(preds.tolist())
-        all_labels.extend(labels.tolist())
-
-accuracy = accuracy_score(all_labels, all_preds)
-print(f'Accuracy: {accuracy * 100:.2f}%')
+if __name__ == '__main__':
+    main()

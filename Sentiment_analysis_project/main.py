@@ -15,7 +15,12 @@ def train(sentiments_list, messages_list):
     X = vectorizer.fit_transform(messages_list)  # Transform phrases into a bag-of-words representation
 
     # Split data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, sentiments_list, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, sentiments_list, test_size=0.1, random_state=42)
+
+    # Using set to get unique values
+    unique_prediction_values = set(y_train)
+    # Print unique values
+    print("Possible prediction values : ", unique_prediction_values)
 
     # Initialize and train the Naive Bayes classifier
     model = MultinomialNB()
@@ -41,8 +46,12 @@ def predict_phrase(model, vectorizer):
 
 
 def main():
-    sentiments_list, messages_list = data_processing.load_data(training_csv_path)
-    messages_list_unicode = data_processing.pre_process_phrases(messages_list)
+    train_sentiments_list, train_messages_list_unicode = data_processing.data_pre_processing(training_csv_path)
+    val_sentiments_list, val_messages_list_unicode = data_processing.data_pre_processing(validation_csv_path)
+
+    # Merge the train and split. We will automatically split and shuffle the data afterward in the train method.
+    sentiments_list = train_sentiments_list + val_sentiments_list
+    messages_list_unicode = train_messages_list_unicode + val_messages_list_unicode
 
     model, vectorizer = train(sentiments_list, messages_list_unicode)  # Get the trained model and vectorizer
 

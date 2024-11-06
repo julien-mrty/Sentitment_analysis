@@ -1,4 +1,4 @@
-import data_processing
+from V1_twitter import data_processing
 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.model_selection import train_test_split

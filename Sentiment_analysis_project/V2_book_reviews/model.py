@@ -1,71 +1,27 @@
-import torch
 import torch.nn as nn
-from transformers import BertModel, BertTokenizer
+import torch
+from transformers import BertModel
 
 
-class ReviewModel(nn.Module):
+class SentimentAnalysisModel(nn.Module):
     def __init__(self):
-        super(ReviewModel, self).__init__()
-        # Text feature extraction with BERT
+        super(SentimentAnalysisModel, self).__init__()
         self.bert = BertModel.from_pretrained('bert-base-uncased')
-        self.bert_hidden_size = self.bert.config.hidden_size
+        self.fc_helpfulness = nn.Linear(1, 32)  # for review_helpfulness
+        self.fc_combined = nn.Linear(768 + 32, 5)  # output 5 classes instead of 1
 
-        # Numerical feature layers
-        self.num_features_layer = nn.Sequential(
-            nn.Linear(2, 64),  # For review_helpfulness and review_score
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(64, 32)
-        )
-
-        # Final classification layer
-        self.classifier = nn.Sequential(
-            nn.Linear(self.bert_hidden_size + 32, 64),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(64, 3)  # Assuming 3 classes: Positive, Neutral, Negative
-        )
-
-    def forward(self, input_ids, attention_mask, numerical_features):
-        # Process text features through BERT
+    def forward(self, input_ids, attention_mask, review_helpfulness):
+        # BERT encoding for text
         bert_output = self.bert(input_ids=input_ids, attention_mask=attention_mask)
-        text_features = bert_output.pooler_output  # Shape: (batch_size, bert_hidden_size)
+        pooled_output = bert_output.pooler_output  # (batch_size, 768)
 
-        # Process numerical features through dense layers
-        num_features = self.num_features_layer(numerical_features)
+        # Dense layer for helpfulness
+        helpfulness_output = torch.relu(self.fc_helpfulness(review_helpfulness.unsqueeze(1)))
 
-        # Concatenate text and numerical features
-        combined_features = torch.cat((text_features, num_features), dim=1)
+        # Concatenate and final layer
+        combined_output = torch.cat((pooled_output, helpfulness_output), dim=1)
+        output = self.fc_combined(combined_output)
 
-        # Final classification
-        output = self.classifier(combined_features)
-        return output
-
-
-# Example usage:
-# Initialize model, tokenizer, and define inputs (tokenize text data, prepare numerical features)
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-model = ReviewModel()
-
-# Assume `texts` contains review summaries/texts, and `num_data` contains helpfulness and score
-inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
-numerical_data = torch.tensor(num_data, dtype=torch.float32)
-
-# Forward pass through the model
-logits = model(inputs['input_ids'], inputs['attention_mask'], numerical_data)
-
-
-"""INPUT"""
-
-from transformers import BertTokenizer
-
-# Load BERT tokenizer
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-
-# Tokenize input text
-input_text = "Hello, how are you?"
-inputs = tokenizer(input_text, return_tensors='pt')
-
-input_ids = inputs['input_ids']           # Input IDs
-attention_mask = inputs['attention_mask'] # Attention Mask
-
+        # Apply softmax for probability distribution across 5 classes
+        return torch.softmax(output, dim=1)
+    

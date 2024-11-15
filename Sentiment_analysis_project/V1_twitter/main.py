@@ -10,11 +10,11 @@ validation_csv_path = "C:/Users/julie/Desktop/All/Important/Polytech/Inge_3/AI/D
 
 
 def train(sentiments_list, messages_list):
-    # Convert text data to numerical features
+    # Convert text Data to numerical features
     vectorizer = CountVectorizer()
     X = vectorizer.fit_transform(messages_list)  # Transform phrases into a bag-of-words representation
 
-    # Split data into training and testing sets
+    # Split Data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(X, sentiments_list, test_size=0.1, random_state=42)
 
     # Using set to get unique values
@@ -22,7 +22,7 @@ def train(sentiments_list, messages_list):
     # Print unique values
     print("Possible prediction values : ", unique_prediction_values)
 
-    # Initialize and train the Naive Bayes classifier
+    # Initialize and Train the Naive Bayes classifier
     model = MultinomialNB()
     model.fit(X_train, y_train)
 
@@ -49,7 +49,7 @@ def main():
     train_sentiments_list, train_messages_list_unicode = data_processing.data_pre_processing(training_csv_path)
     val_sentiments_list, val_messages_list_unicode = data_processing.data_pre_processing(validation_csv_path)
 
-    # Merge the train and split. We will automatically split and shuffle the data afterward in the train method.
+    # Merge the Train and split. We will automatically split and shuffle the Data afterward in the Train method.
     sentiments_list = train_sentiments_list + val_sentiments_list
     messages_list_unicode = train_messages_list_unicode + val_messages_list_unicode
 

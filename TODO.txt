@@ -1,0 +1,5 @@
+TODO :
+
+- split the dataset
+- Save the model
+- Sckit learn imbalance metrics

@@ -1,18 +1,11 @@
 import pandas as pd
 from fractions import Fraction
 import pickle
+from datetime import datetime
 
 
-"""
-Data_storage cleaning :
-0 helpfulness
-review summary with only ids
-emtpy review ?
-"""
-
-
-def data_processing(csv_path, n_rows, min_helpfulness, default_helpfulness):
-    review_helpfulness, review_score, review_summary, review_text = load_data(csv_path, n_rows)
+def data_processing(csv_path, n_samples, min_helpfulness, default_helpfulness):
+    review_helpfulness, review_score, review_summary, review_text = load_data(csv_path, n_samples)
     review_helpfulness, review_score, review_summary, review_text = clean_data(review_helpfulness, review_score,
                                                                                review_summary, review_text,
                                                                                min_helpfulness, default_helpfulness)
@@ -26,6 +19,28 @@ def data_processing(csv_path, n_rows, min_helpfulness, default_helpfulness):
     }
 
     return data
+
+
+def get_name(n_samples, split_ratio, num_epochs, learning_rate):
+    # Get the current date and time
+    current_time = datetime.now()
+
+    # Format the date and time to exclude seconds
+    formatted_time = current_time.strftime("%Y-%m-%d_%H-%M")
+
+    name = f"{formatted_time}_ns{n_samples}_sr{split_ratio}_epochs{num_epochs}_lr{learning_rate}"
+
+    return name
+
+
+def split_data(data, split_ratio):
+    split_point = int(split_ratio * len(data["score"]))
+
+    # Create two dictionaries
+    train_data = {key: values[:split_point] for key, values in data.items()}
+    validation_data = {key: values[split_point:] for key, values in data.items()}
+
+    return train_data, validation_data
 
 
 def clean_data(review_helpfulness, review_score, review_summary, review_text, min_helpfulness, default_helpfulness):
@@ -87,9 +102,9 @@ def remove_no_helpfulness(review_helpfulness, review_score, review_summary, revi
     return filtered_review_helpfulness, filtered_review_score, filtered_review_summary, filtered_review_text
 
 
-def load_data(file_path, n_rows):
+def load_data(file_path, n_samples):
     print("Loading Data...")
-    df = pd.read_csv(file_path, nrows=n_rows)
+    df = pd.read_csv(file_path, nrows=n_samples)
 
     # Convert each column to a separate list
     review_helpfulness = df.iloc[:, 5].tolist()  # Review helpfulness

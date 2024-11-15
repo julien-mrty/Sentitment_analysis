@@ -1,12 +1,10 @@
 import torch
 from sklearn.metrics import classification_report, confusion_matrix, precision_recall_fscore_support
-import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
+import time
 
 
-
-def train_validate_model(model, dataloader, num_epochs, criterion, optimizer, training_logger):
+def train_validate_model(model, train_data_loader, validation_data_loader, num_epochs, criterion, optimizer, training_logger):
     print("Beginning of training...\n")
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -14,9 +12,11 @@ def train_validate_model(model, dataloader, num_epochs, criterion, optimizer, tr
 
     for epoch in range(num_epochs):
 
+        start_time = time.time()
+
         """ TRAIN MODEL """
-        train_epoch_loss, train_model_output, train_target_values = train_one_epoch(model, dataloader, criterion, optimizer, device)
-        train_avg_loss = train_epoch_loss / len(dataloader)
+        train_epoch_loss, train_model_output, train_target_values = train_one_epoch(model, train_data_loader, criterion, optimizer, device)
+        train_avg_loss = train_epoch_loss / len(train_data_loader)
         print(f"TRAIN : Epoch {epoch + 1}, Loss: {train_avg_loss:.4f}")
 
         # Convert vectors to class labels
@@ -24,31 +24,40 @@ def train_validate_model(model, dataloader, num_epochs, criterion, optimizer, tr
         train_model_labels = np.argmax(train_model_output, axis=1)
         num_labels = max(train_target_labels)
 
-        print("train_target_labels : ", train_target_labels)
-        print("train_model_labels : ", train_model_labels)
+        print("target",train_target_labels)
 
-        train_report = classification_report(train_target_labels, train_model_labels, labels=range(1, num_labels + 1),
-                                                                      zero_division=0, output_dict=True)
+        train_report = classification_report(train_target_labels, train_model_labels, labels=range(0, num_labels + 1),
+                                             zero_division=0, output_dict=True)
         train_confusion_matrix = confusion_matrix(train_target_labels, train_model_labels)
 
+        print("TRAIN REPORT : ", train_report)
 
         """ TEST MODEL """
-        val_loss, val_model_predictions, val_target_values = validate_model(model, dataloader, criterion, device)
-        val_avg_loss = val_loss / len(dataloader)
-        print(f"===> VALIDATION : Epoch {epoch + 1}, Loss: {val_avg_loss:.4f}")
+        val_loss, val_model_predictions, val_target_values = validate_model(model, validation_data_loader, criterion, device)
+        val_avg_loss = val_loss / len(validation_data_loader)
+        print(f"VALIDATION : Epoch {epoch + 1}, Loss : {val_avg_loss:.4f}")
 
         # Convert vectors to class labels
         val_target_labels = np.argmax(val_target_values, axis=1)
         val_model_labels = np.argmax(val_model_predictions, axis=1)
         num_labels = max(val_target_labels)
 
-        validation_report = classification_report(val_target_labels, val_model_labels, labels=range(1, num_labels + 1),
-                                                                      zero_division=0, output_dict=True)
+        validation_report = classification_report(val_target_labels, val_model_labels, labels=range(0, num_labels + 1),
+                                                  zero_division=0, output_dict=True)
         val_confusion_matrix = confusion_matrix(val_target_labels, val_model_labels)
 
-        # Log the epoch information
+        print("VAL REPORT : ", validation_report)
+
+        # Log the epoch information, including imbalance metrics
         training_logger.log_epoch(epoch, train_avg_loss, train_report, val_avg_loss, validation_report,
                                   train_confusion_matrix, val_confusion_matrix)
+
+        end_time = time.time()  # Record the end time of the epoch
+        epoch_duration = end_time - start_time  # Calculate the duration of the epoch
+        total_samples = len(train_data_loader.dataset) + len(validation_data_loader.dataset)  # Total samples processed
+        avg_time_per_sample = epoch_duration / total_samples  # Calculate average time per sample
+
+        print(f"======== Epoch {epoch + 1} epoch duration: {epoch_duration:.2f}sec, per sample : {avg_time_per_sample:.6f}sec")
 
     return model, training_logger
 
@@ -60,7 +69,10 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device):
     model_output_list = []
     target_values_list = []
 
-    for input_ids, attention_mask, review_helpfulness, score in dataloader:
+    total_samples = len(dataloader.dataset)  # Total number of samples in the epoch
+    sample_count = 0  # Counter to track the number of samples processed
+
+    for batch_idx, (input_ids, attention_mask, review_helpfulness, score) in enumerate(dataloader):
         input_ids = input_ids.to(device)
         attention_mask = attention_mask.to(device)
         review_helpfulness = review_helpfulness.to(device)
@@ -78,6 +90,13 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device):
         model_output_list.extend(outputs.detach().cpu().numpy())
         target_values_list.extend(score.detach().cpu().numpy())
 
+        # Update sample count
+        sample_count += len(input_ids)
+
+        # Print the loss and progress at the end of each batch
+        print(f"TRAIN : Batch {batch_idx + 1}/{len(dataloader)} : Loss = {loss.item():.4f}, "
+              f"Processed Samples: {sample_count}/{total_samples}")
+
     return epoch_loss, model_output_list, target_values_list
 
 
@@ -87,9 +106,11 @@ def validate_model(model, dataloader, criterion, device):
     val_loss = 0
     model_predictions = []
     target_values = []
+    total_samples = len(dataloader.dataset)  # Total number of samples in the validation set
+    sample_count = 0  # Counter to track the number of samples processed
 
     with torch.no_grad():
-        for input_ids, attention_mask, review_helpfulness, score in dataloader:
+        for batch_idx, (input_ids, attention_mask, review_helpfulness, score) in enumerate(dataloader):
             input_ids = input_ids.to(device)
             attention_mask = attention_mask.to(device)
             review_helpfulness = review_helpfulness.to(device)
@@ -99,11 +120,16 @@ def validate_model(model, dataloader, criterion, device):
             loss = criterion(outputs, score)
 
             val_loss += loss.item()
-            model_predictions.extend(outputs)
-            target_values.extend(score)
 
             # Detach and convert to numpy for sklearn compatibility
             model_predictions.extend(outputs.detach().cpu().numpy())
             target_values.extend(score.detach().cpu().numpy())
+
+            # Update sample count
+            sample_count += len(input_ids)
+
+            # Print progress at the end of each batch
+            print(f"VALIDATION : Batch {batch_idx + 1}/{len(dataloader)} : Loss = {loss.item():.4f}, "
+                  f"Processed Samples: {sample_count}/{total_samples}")
 
     return val_loss, model_predictions, target_values

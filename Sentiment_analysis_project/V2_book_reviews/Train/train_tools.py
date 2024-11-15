@@ -1,25 +1,29 @@
 import matplotlib.pyplot as plt
-import pickle
-import os
 import seaborn as sns
 import numpy as np
 
 
-def plot_training_results(logger):
+# Add this function to plot training results
+def plot_training_results(logger, num_classes=5):
     # First plot the 5 main metrics
     fig, axis = plt.subplots(3, 2, figsize=(18, 12))
 
     plot_loss_records(logger, axis[0, 0])
-    plot_metric_records(logger, 'accuracy', 'Train and Validation Accuracy', 'Accuracy', axis[0, 1])
-    plot_metric_records(logger, 'precision', 'Train and Validation Precision', 'Precision', axis[1, 0], 'macro avg', 'precision')
+    plot_metric_records(logger, 'accuracy', 'Train and Validation Accuracy', 'Accuracy', axis[0, 1], 'accuracy')
+    plot_metric_records(logger, 'precision', 'Train and Validation Precision', 'Precision', axis[1, 0], 'macro avg',
+                        'precision')
     plot_metric_records(logger, 'recall', 'Train and Validation Recall', 'Recall', axis[1, 1], 'macro avg', 'recall')
-    plot_metric_records(logger, 'f1-score', 'Train and Validation F1-score', 'F1-score', axis[2, 0], 'macro avg', 'f1-score')
+    plot_metric_records(logger, 'f1-score', 'Train and Validation F1-score', 'F1-score', axis[2, 0], 'macro avg',
+                        'f1-score')
 
     plt.tight_layout()
     plt.show()
 
     # Then plot the confusion matrices for Train and validation
     plot_confusion_matrix(logger)
+
+    # Then plot the metrics for each class
+    plot_metrics_per_class(logger, num_classes=num_classes)
 
 
 def plot_loss_records(logger, axis):
@@ -71,14 +75,11 @@ def plot_confusion_matrix(logger):
     train_confusion_matrix = history['train_confusion_matrix']
     val_confusion_matrix = history['val_confusion_matrix']
 
-    print("train_confusion_matrix : ", train_confusion_matrix)
-    print("val_confusion_matrix : ", val_confusion_matrix)
-
     train_mean_confusion_matrix = np.sum(train_confusion_matrix, axis=0) / len(train_confusion_matrix)
     val_mean_confusion_matrix = np.sum(val_confusion_matrix, axis=0) / len(val_confusion_matrix)
 
     n_labels = len(train_mean_confusion_matrix[0])
-    print("N LABELS, ", n_labels)
+    print("N LABELS in confusion matrix, ", n_labels)
     labels_indexes = list(range(1, n_labels + 1))
 
     # Create subplots
@@ -105,25 +106,30 @@ def plot_confusion_matrix(logger):
     plt.show()
 
 
-def save_model(model_save_path, model):
-    try:
-        file_name = os.path.join(model_save_path, f"{model.name}.pkl")
-        with open(file_name, 'wb') as file:
-            pickle.dump(model, file)
-        print(f"Model saved successfully to: {file_name}")
-    except Exception as e:
-        print(f"Error saving model: {e}")
+def plot_metrics_per_class(logger, num_classes=5):
+    """
+    Plots precision, recall, and F1-score for each class on the same plot.
+    """
+    history = logger.get_history()
+    epochs = history['epoch']
+    metrics = ['precision', 'recall', 'f1-score']
 
+    for class_idx in range(num_classes):
+        plt.figure(figsize=(10, 6))  # Create a new figure for each class
 
-def load_model(model_save_path, model_name):
-    try:
-        file_name = os.path.join(model_save_path, f"{model_name}.pkl")
-        with open(file_name, 'rb') as file:
-            model = pickle.load(file)
-        print(f"Model {model_name} loaded successfully from: {file_name}")
-        return model
+        for metric in metrics:
+            # Fetch metric values for each class
+            train_metric_values = logger.get_values_from_reports_with_inside_key("train_report", str(class_idx), metric)
+            val_metric_values = logger.get_values_from_reports_with_inside_key("val_report", str(class_idx), metric)
 
-    except FileNotFoundError:
-        print(f"Model file {file_name} not found.")
-    except Exception as e:
-        print(f"Error loading model: {e}")
+            # Plot the metric on the same plot
+            plt.plot(epochs, train_metric_values, marker='o', linestyle='-', label=f'Train {metric.capitalize()}')
+            plt.plot(epochs, val_metric_values, marker='x', linestyle='--', label=f'Validation {metric.capitalize()}')
+
+        # Add labels, title, legend, and grid
+        plt.xlabel('Epochs')
+        plt.ylabel('Metric Value')
+        plt.title(f'Metrics for Class {class_idx}')
+        plt.legend()
+        plt.grid(True)
+        plt.show()

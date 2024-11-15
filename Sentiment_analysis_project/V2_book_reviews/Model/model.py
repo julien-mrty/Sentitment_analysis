@@ -24,4 +24,3 @@ class SentimentAnalysisModel(nn.Module):
 
         # Apply softmax for probability distribution across 5 classes
         return torch.softmax(output, dim=1)
-    

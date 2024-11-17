@@ -2,6 +2,7 @@ import pandas as pd
 from fractions import Fraction
 import pickle
 from datetime import datetime
+import random
 
 
 def data_processing(csv_path, n_samples, min_helpfulness, default_helpfulness):
@@ -17,6 +18,30 @@ def data_processing(csv_path, n_samples, min_helpfulness, default_helpfulness):
         "summary": review_summary,
         "text": review_text
     }
+
+    return data
+
+
+def delete_score_reviews(data, reviews_percentage_to_remove, score_to_remove):
+    # Identify indices of 5-star reviews. Score is from 0 to 4 and not 1 to 5
+    indices__max_score_reviews = [i for i, score in enumerate(data["score"]) if score[score_to_remove] == 1]
+
+    # Randomly select indices to delete
+    # For example, let's delete 50% of 4-star reviews
+    num_to_delete = int(len(indices__max_score_reviews) * reviews_percentage_to_remove)
+    indices_to_delete = random.sample(indices__max_score_reviews, num_to_delete)
+
+    # Delete the selected reviews
+    # First, create a set for faster lookup
+    indices_to_delete_set = set(indices_to_delete)
+
+    # Now, filter out the reviews at the selected indices
+    data["helpfulness"] = [h for i, h in enumerate(data["helpfulness"]) if i not in indices_to_delete_set]
+    data["score"] = [s for i, s in enumerate(data["score"]) if i not in indices_to_delete_set]
+    data["summary"] = [s for i, s in enumerate(data["summary"]) if i not in indices_to_delete_set]
+    data["text"] = [t for i, t in enumerate(data["text"]) if i not in indices_to_delete_set]
+
+    print("AFTER LEN DATA SCORE : ", len(data["score"]))
 
     return data
 
@@ -55,7 +80,6 @@ def clean_data(review_helpfulness, review_score, review_summary, review_text, mi
 
 
 def check_score(review_score):
-    # Assume `predictions` is your list of continuous values
     new_review_score = [max(1, min(5, int(round(p)))) for p in review_score]
 
     return new_review_score

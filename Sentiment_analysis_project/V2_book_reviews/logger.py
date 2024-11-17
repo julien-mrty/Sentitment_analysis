@@ -5,22 +5,22 @@ class ModelTrainingLogger:
     def __init__(self):
         self.history = {
             'epoch': [],
+            'learning_rate': [],
             'train_loss': [],
             'train_report': [],
             'train_confusion_matrix': [],
             'val_loss': [],
             'val_report': [],
             'val_confusion_matrix': [],
-            'learning_rate': [],
         }
 
-    def log_epoch(self, epoch, train_loss, train_report, val_loss, val_report, train_confusion_matrix, val_confusion_matrix):
+    def log_epoch(self, epoch, learning_rate, train_loss, train_report, val_loss, val_report, train_confusion_matrix, val_confusion_matrix):
         self.history['epoch'].append(epoch)
+        self.history['learning_rate'].append(learning_rate)
         self.history['train_loss'].append(train_loss)
         self.history['train_report'].append(train_report)
         self.history['val_loss'].append(val_loss)
         self.history['val_report'].append(val_report)
-        #self.history['learning_rate'].append(learning_rate)
         self.history['train_confusion_matrix'].append(train_confusion_matrix)
         self.history['val_confusion_matrix'].append(val_confusion_matrix)
 

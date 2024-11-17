@@ -4,8 +4,8 @@ import numpy as np
 import time
 
 
-def train_validate_model(model, train_data_loader, validation_data_loader, num_epochs, criterion, optimizer,
-                         training_logger, print_freq, weight_decay):  # Added weight_decay parameter
+def train_validate_model(model, train_data_loader, validation_data_loader, num_epochs, criterion, optimizer, scheduler,
+                         training_logger, print_freq):  # Added weight_decay parameter
 
     print("Beginning of training...\n")
 
@@ -14,13 +14,19 @@ def train_validate_model(model, train_data_loader, validation_data_loader, num_e
 
     total_start_time = time.time()  # Start time for the entire training process
 
+    # Initialize early stopping variables
+    best_val_loss = float('inf')
+    patience = 2  # Number of epochs to wait before stopping
+    trigger_times = 0
+
     for epoch in range(num_epochs):
 
         start_time = time.time()
 
         """ TRAIN MODEL """
-        train_epoch_loss, train_model_output, train_target_values = train_one_epoch(model, train_data_loader, criterion,
-                                                                                    optimizer, device, print_freq)
+        train_epoch_loss, train_model_output, train_target_values, current_lr = train_one_epoch(model, train_data_loader, criterion,
+                                                                                    optimizer, scheduler, device,
+                                                                                    print_freq)
         train_avg_loss = train_epoch_loss / len(train_data_loader)
         print(f"TRAIN : Epoch {epoch + 1}, Loss: {train_avg_loss:.4f}")
 
@@ -49,7 +55,7 @@ def train_validate_model(model, train_data_loader, validation_data_loader, num_e
         val_confusion_matrix = confusion_matrix(val_target_labels, val_model_labels)
 
         # Log the epoch information, including imbalance metrics
-        training_logger.log_epoch(epoch, train_avg_loss, train_report, val_avg_loss, validation_report,
+        training_logger.log_epoch(epoch, current_lr, train_avg_loss, train_report, val_avg_loss, validation_report,
                                   train_confusion_matrix, val_confusion_matrix)
 
         end_time = time.time()  # Record the end time of the epoch
@@ -59,6 +65,20 @@ def train_validate_model(model, train_data_loader, validation_data_loader, num_e
 
         print(f"======== Epoch {epoch + 1} epoch duration: {epoch_duration:.2f}sec, per sample : {avg_time_per_sample:.6f}sec")
 
+        # Early stopping check
+        if val_avg_loss < best_val_loss:
+            best_val_loss = val_avg_loss
+            trigger_times = 0
+            # Save the best model
+            torch.save(model.state_dict(), 'best_model_state_dict.pth')
+        else:
+            trigger_times += 1
+            print(f'EarlyStopping: {trigger_times} out of {patience}')
+            if trigger_times >= patience:
+                print('Early stopping!')
+                break
+
+
     total_end_time = time.time()  # End time for the entire training process
     total_training_time = total_end_time - total_start_time  # Calculate total training time
 
@@ -67,7 +87,7 @@ def train_validate_model(model, train_data_loader, validation_data_loader, num_e
     return model, training_logger
 
 
-def train_one_epoch(model, dataloader, criterion, optimizer, device, print_freq):
+def train_one_epoch(model, dataloader, criterion, optimizer, scheduler, device, print_freq):
     model.train()
 
     epoch_loss = 0
@@ -88,6 +108,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, print_freq)
         loss = criterion(outputs, score)
         loss.backward()
         optimizer.step()
+        scheduler.step()  # Update learning rate
 
         epoch_loss += loss.item()
 
@@ -101,10 +122,11 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device, print_freq)
         # Print the loss and progress at the specified print frequency
         if (batch_idx + 1) % print_freq == 0:
             avg_loss = epoch_loss / (batch_idx + 1)
+            current_lr = scheduler.get_last_lr()[0]
             print(f"TRAIN : Batch {batch_idx + 1}/{len(dataloader)} : Loss = {avg_loss:.4f}, "
-                  f"Processed Samples: {sample_count}/{total_samples}")
+                  f"LR = {current_lr:.1e}, Processed Samples: {sample_count}/{total_samples}")
 
-    return epoch_loss, model_output_list, target_values_list
+    return epoch_loss, model_output_list, target_values_list, current_lr
 
 
 def validate_model(model, dataloader, criterion, device, print_freq):

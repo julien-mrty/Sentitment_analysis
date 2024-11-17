@@ -15,6 +15,7 @@ def plot_training_results(logger, num_classes=5):
     plot_metric_records(logger, 'recall', 'Train and Validation Recall', 'Recall', axis[1, 1], 'macro avg', 'recall')
     plot_metric_records(logger, 'f1-score', 'Train and Validation F1-score', 'F1-score', axis[2, 0], 'macro avg',
                         'f1-score')
+    plot_learning_rate(logger, axis[2, 1])
 
     plt.tight_layout()
     plt.show()
@@ -39,6 +40,21 @@ def plot_loss_records(logger, axis):
     axis.set_xlabel('Epochs')
     axis.set_ylabel('Loss values')
     axis.set_title('Train and Validation Loss Values Through Epochs')
+    axis.legend()
+    axis.grid(True)
+
+
+def plot_learning_rate(logger, axis):
+    history = logger.get_history()
+
+    learning_rate = history['learning_rate']
+    epochs = history['epoch']
+
+    # Create the plot
+    axis.plot(epochs, learning_rate, marker='o', linestyle='-', color='b', label='learning rate')
+    axis.set_xlabel('Epochs')
+    axis.set_ylabel('Learning rate')
+    axis.set_title('Learning rate through epochs')
     axis.legend()
     axis.grid(True)
 

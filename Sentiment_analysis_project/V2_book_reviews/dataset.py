@@ -1,13 +1,15 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer, BertModel
+from transformers import DistilBertTokenizer
 
 
 class AmazonReviewDataset(Dataset):
     def __init__(self, data):
         self.data = data
         # Initialize tokenizer
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        #self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 
     def __len__(self):
         return len(self.data['score'])

@@ -1,3 +1,4 @@
+import torch
 from V2_book_reviews.dataset import AmazonReviewDataset
 from V2_book_reviews import paths
 from V2_book_reviews.Data import data_processing
@@ -9,32 +10,34 @@ from V2_book_reviews.Model.model import SentimentAnalysisModel
 from V2_book_reviews.Model import model_tools
 import torch.nn as nn
 import torch.optim as optim
-import torch
 
 
 """ Dataset : https://www.kaggle.com/datasets/mohamedbakhet/amazon-books-reviews """
-training_csv_path = paths.training_csv_path
+# Get the paths depending on the environment
+training_csv_path, data_filename, results_rectory = paths.get_paths()
 
 
 """ Data_storage parameters """
-n_samples = 100
+n_samples = 2000
 min_helpfulness = -1 # Minimum value of helpfulness, between 0 and 1
 default_helpfulness = 1e-3 # If the review has no helpfulness review
-data_filename = f"Data_storage/data_reviews_" + str(n_samples)
-results_rectory = "Training_results/"
+data_filename += str(n_samples) # Update the name with the current number of samples
 
 
 """ Hyperparameters """
-batch_size = 64
+batch_size = 32
 shuffle = True
 learning_rate = 1e-3
-num_epochs = 1
-split_ratio = 0.75
+weight_decay = 1e-8
+num_epochs = 3
+split_ratio = 0.8
+print_freq = 5 # Every X batch
 
 
 def main():
-    data_processing.get_name(n_samples, split_ratio, num_epochs, learning_rate)
-
+    if torch.cuda.is_available():
+        print("torch.cuda.device_count() : ", torch.cuda.device_count())
+        print("Training on : ", torch.cuda.get_device_name(0))
 
     if not (os.path.isfile(data_filename)):
         print("Data_storage extraction from csv...")
@@ -56,12 +59,16 @@ def main():
     # Initialize model, loss function, and optimizer
     print("Model initialisation...\n")
     model = SentimentAnalysisModel()
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    model.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+
+    # Create training logger for the model's training
     training_logger = logger.ModelTrainingLogger()
 
-    model, training_logger = train.train_validate_model(model, train_data_loader, validation_data_loader, num_epochs, criterion, optimizer, training_logger)
-
+    model, training_logger = train.train_validate_model(model, train_data_loader, validation_data_loader, num_epochs,
+                                                        criterion, optimizer, training_logger, print_freq, weight_decay)
     # Save the model and logger
     model_filename, logger_filename = save_model_logger(model, training_logger)
 

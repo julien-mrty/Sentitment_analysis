@@ -14,7 +14,7 @@ class AmazonReviewDataset(Dataset):
 
     def __getitem__(self, idx):
         # Tokenize text
-        inputs = self.tokenizer(self.data['text'][idx] + ' ' + self.data['summary'][idx],
+        inputs = self.tokenizer(str(self.data['text'][idx]) + ' ' + str(self.data['summary'][idx]),
                            return_tensors="pt", padding="max_length",
                            truncation=True, max_length=256)
 

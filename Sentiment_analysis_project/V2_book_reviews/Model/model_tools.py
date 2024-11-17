@@ -26,6 +26,7 @@ def use_model(model):
 
         # Get predicted class (index of max probability)
         predicted_class = torch.argmax(predictions, dim=1).item()
+        print("Model prediction : ", predictions)
 
         print(f"Predicted Sentiment Class: {predicted_class}")
 

@@ -23,4 +23,4 @@ class SentimentAnalysisModel(nn.Module):
         output = self.fc_combined(combined_output)
 
         # Apply softmax for probability distribution across 5 classes
-        return torch.softmax(output, dim=1)
+        return output

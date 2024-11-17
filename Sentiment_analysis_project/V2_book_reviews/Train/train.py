@@ -69,8 +69,6 @@ def train_validate_model(model, train_data_loader, validation_data_loader, num_e
         if val_avg_loss < best_val_loss:
             best_val_loss = val_avg_loss
             trigger_times = 0
-            # Save the best model
-            torch.save(model.state_dict(), 'best_model_state_dict.pth')
         else:
             trigger_times += 1
             print(f'EarlyStopping: {trigger_times} out of {patience}')

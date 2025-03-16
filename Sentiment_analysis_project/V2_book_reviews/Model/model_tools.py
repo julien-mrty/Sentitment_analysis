@@ -1,5 +1,6 @@
 import torch
 from transformers import BertTokenizer
+import torch.nn.functional as F
 
 
 def use_model(model):
@@ -26,9 +27,9 @@ def use_model(model):
 
         # Get predicted class (index of max probability)
         predicted_class = torch.argmax(predictions, dim=1).item()
-        print("Model prediction : ", predictions)
-
-        print(f"Predicted Sentiment Class: {predicted_class}")
+        model_softmax = F.softmax(predictions, dim=-1)
+        print("Model prediction : ", predicted_class + 1)
+        print(f"Model output : {model_softmax}")
 
 
 # Function to preprocess input
